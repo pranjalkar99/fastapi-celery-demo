@@ -32,8 +32,8 @@ services:
       - SECRETKEY=9b52c64430979adc8d9523fa36f02fae28d18a5a537425c66af11016eb8e19a5
       - CLIENT_ACCESS_ID=ovvy-daas-api
       - CLIENT_ACCESS_KEY=ovvy-business-2024
-      - DATABASE_HOST="35.225.223.91"
-      - DATABASE_NAME='ovvy_admin_dev_users'
+      - DATABASE_HOST=35.225.223.91
+      - DATABASE_NAME=ovvy_admin_dev_users
       - DATABASE_PORT=5432
       - DATABASE_USERNAME=test
       - DATABASE_PASSWORD=test
