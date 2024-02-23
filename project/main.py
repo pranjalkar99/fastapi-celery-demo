@@ -61,7 +61,7 @@ def get_status(task_id: str, current_user: dict = Depends(verify_token)):
 
 @app.post("/create-token")
 async def create_token(
-    business_id: str, 
+    business_id: str= Header(..., description="Business ID"), 
     business_api_key: str = Header(..., description="Business API Key"),
     secret_key: str = Header(..., description="Secret Key")
 ):
