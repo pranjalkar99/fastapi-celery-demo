@@ -85,3 +85,18 @@ def update_webhook_url(user_id: str, webhook_url: str):
     else:
         # If the user does not exist, you might want to handle this case accordingly
         raise HTTPException(status_code=404, detail="User not found")
+
+
+def get_webhook_url(user_id: str):
+    # Query to retrieve the webhook_url for the given user_id
+    query = f"SELECT webhook_url FROM {TABLE} WHERE user_id = %s;"
+    params = (user_id,)
+    
+    # Execute the query to get the webhook_url
+    result = execute_query(query, params, fetch_all=False)
+
+    if result:
+        return result[0]  # Assuming the result is a single value (webhook_url)
+    else:
+        
+        raise HTTPException(status_code=404, detail="Webhook url not configured...")

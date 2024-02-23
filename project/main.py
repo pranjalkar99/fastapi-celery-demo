@@ -32,7 +32,10 @@ def home(request: Request):
 def run_task(payload: dict = Body(...), current_user: dict = Depends(verify_token)):
     folder_id = payload["folder_id"]
     images = payload.get("images", [])  # Assuming images is a list in the payload
-    task = create_task.delay(folder_id, images)
+    
+    webhook_url = get_webhook_url(current_user["user_id"])
+
+    task = create_task.delay(folder_id, images, webhook_url)
     return JSONResponse({"task_id": task.id})
 
 @app.get("/tasks/{task_id}")
