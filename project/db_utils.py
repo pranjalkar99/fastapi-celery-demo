@@ -26,15 +26,17 @@ def get_db_connection():
     )
 
 # Function to execute a query
-def execute_query(query, fetch_all=True):
+def execute_query(query, params=None, fetch_all=True):
     connection = get_db_connection()
     cursor = connection.cursor()
-    cursor.execute(query)
-    result = cursor.fetchall() if fetch_all else cursor.fetchone()
-    cursor.close()
-    connection.close()
-    return result
-
+    
+    try:
+        cursor.execute(query, params)
+        result = cursor.fetchall() if fetch_all else cursor.fetchone()
+        return result
+    finally:
+        cursor.close()
+        connection.close()
 
 
 
@@ -54,7 +56,6 @@ def create_jwt_token(data: dict, expires_delta: int = ACCESS_TOKEN_EXPIRE_MINUTE
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# Function to verify JWT token
 def verify_token(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=401,
@@ -66,4 +67,3 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         return payload
     except JWTError:
         raise credentials_exception
-
