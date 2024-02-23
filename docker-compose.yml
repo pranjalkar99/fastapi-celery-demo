@@ -39,6 +39,7 @@ services:
       - DATABASE_PASSWORD=test
       - TOKEN_LIMIT=10080
       - TOKEN_ALGORITHM=HS256
+      - TABLE_NAME=ovvy_admin_dev_users
 
 
     depends_on:
