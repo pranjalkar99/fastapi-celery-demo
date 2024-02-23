@@ -15,19 +15,13 @@ from worker import create_task
 
 
 
-def get_current_user(authorization: str = Header(...)):
-    credentials = authenticate_user(authorization)  # Implement your user authentication logic
-    if credentials is None:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    return credentials
-
 
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-
+TABLE = os.getenv('TABLE_NAME')
 
 @app.get("/")
 def home(request: Request):
@@ -67,7 +61,7 @@ def get_status(task_id: str, current_user: dict = Depends(verify_token)):
 
 @app.post("/create-token")
 async def create_token(business_id: str, business_api_key: str, secret_key: str):
-    query = "SELECT * FROM users WHERE business_id = %s AND business_api_key = %s AND secret_key = %s;"
+    query = "SELECT * FROM {TABLE} WHERE business_id = %s AND business_api_key = %s AND secret_key = %s;"
     params = (business_id, business_api_key, secret_key)
     
     result = execute_query(query, params, fetch_all=False)
