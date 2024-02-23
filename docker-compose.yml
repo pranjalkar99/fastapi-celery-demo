@@ -62,7 +62,7 @@ services:
 
   dashboard:
     build: ./project
-    command: celery --broker=redis://redis:6379/0 flower  --port=5555 
+    command: celery --broker=redis://redis:6379/0 flower  --port=5555 --basic_auth=ovvy-daas-api:ovvy-business-2024
     ports:
       - 5556:5555
     environment:
