@@ -77,3 +77,12 @@ async def create_token(
     else:
         # If credentials are invalid, raise an HTTPException with 401 Unauthorized status
         raise HTTPException(status_code=401, detail="Unauthorized")
+
+@app.post("/set-webhook")
+def set_webhook(
+    webhook_url: str,
+    current_user: dict = Depends(verify_token)
+):
+    update_webhook_url(user_id=current_user["user_id"], webhook_url=webhook_url)
+    
+    return {"message": "Webhook set successfully"}

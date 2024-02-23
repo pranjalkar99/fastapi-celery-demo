@@ -1,11 +1,13 @@
 import os
 import time
 from typing import List
-import requests
+import requests, json
 import base64
 from io import BytesIO
 from PIL import Image
 import time, logging
+
+from db_utils import *
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +158,53 @@ def send_discord_message(data):
 
     return {"webhook_status_code": response.status_code}
 
+
+@celery.task(name="send_webhook_message")
+def send_webhook_message(data):
+    user_id = data.get('user_id')
+    
+    # Get the webhook_url from the database
+    webhook_url_query = f"SELECT webhook_url FROM {TABLE} WHERE user_id = %s;"
+    webhook_url_params = (user_id,)
+    webhook_url_result = execute_query(webhook_url_query, webhook_url_params, fetch_all=False)
+    
+    if webhook_url_result:
+        webhook_url = webhook_url_result[0]
+        
+        # Extract relevant information from the response
+        status_code = data.get('status_code', 'N/A')
+
+        message = {
+            "content": f"Task {str(data['parent_task_id'])} completed:",
+            "embeds": [
+                {
+                    "title": "Task Details",
+                    "fields": [
+                        {"name": "Status Code", "value": "204", "inline": True},
+                        {"name": "Successful Count", "value": str(data['successful_count']), "inline": True},
+                        {"name": "Failed Count", "value": str(data['failed_count']), "inline": True}
+                    ]
+                }
+            ]
+        }
+
+        headers = {'Content-Type': 'application/json'}
+
+        response = requests.post(webhook_url, data=json.dumps(message), headers=headers)
+
+        if response.status_code == 200:
+            print("Webhook message sent successfully.")
+        else:
+            print(f"Error sending Webhook message. Status code: {response.status_code}")
+
+        return {"webhook_status_code": response.status_code}
+    else:
+        raise HTTPException(status_code=404, detail="Webhook URL not found for the user")
+
+
+
+
+
 @celery.task(name="process_task_completed")
 def process_task_completed(results, parent_task_id):
     successful_count = 0
@@ -188,6 +237,8 @@ def process_task_completed(results, parent_task_id):
 
     # Send message to Discord
     async_result = send_discord_message.delay(result_data)
+
+    async_result2 = send_webhook_message.delay(result_data)
 
     # logging.info(f"Discord Status:{async_result.get()}" )
 

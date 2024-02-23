@@ -12,6 +12,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 load_dotenv()
 
+TABLE = os.getenv('TABLE_NAME')
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -68,3 +69,19 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         return payload
     except JWTError:
         raise credentials_exception
+
+
+def update_webhook_url(user_id: str, webhook_url: str):
+    # Check if the user with the given user_id exists before updating the webhook_url
+    check_user_query = f"SELECT user_id FROM {TABLE} WHERE user_id = %s;"
+    check_user_params = (user_id,)
+    existing_user = execute_query(check_user_query, check_user_params, fetch_all=False)
+
+    if existing_user:
+        # If the user exists, update the webhook_url
+        update_query = f"UPDATE {TABLE} SET webhook_url = %s WHERE user_id = %s;"
+        update_params = (webhook_url, user_id)
+        execute_query(update_query, update_params)
+    else:
+        # If the user does not exist, you might want to handle this case accordingly
+        raise HTTPException(status_code=404, detail="User not found")
