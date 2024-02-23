@@ -45,6 +45,7 @@ SECRET_KEY = os.getenv('SECRETKEY')
 ALGORITHM = os.getenv('TOKEN_ALGORITHM')
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('TOKEN_LIMIT', 15))
 
+
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
