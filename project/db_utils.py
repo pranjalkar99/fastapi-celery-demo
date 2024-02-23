@@ -73,7 +73,7 @@ def verify_token(token: str = Depends(oauth2_scheme)):
 
 def update_webhook_url(user_id: str, webhook_url: str):
     # Check if the user with the given user_id exists before updating the webhook_url
-    check_user_query = f"SELECT user_id FROM {TABLE} WHERE user_id = %s;"
+    check_user_query = f"SELECT id FROM {TABLE} WHERE business_id = %s;"
     check_user_params = (user_id,)
     existing_user = execute_query(check_user_query, check_user_params, fetch_all=False)
 
@@ -87,10 +87,10 @@ def update_webhook_url(user_id: str, webhook_url: str):
         raise HTTPException(status_code=404, detail="User not found")
 
 
-def get_webhook_url(user_id: str):
+def get_webhook_url(business_id: str):
     # Query to retrieve the webhook_url for the given user_id
-    query = f"SELECT webhook_url FROM {TABLE} WHERE user_id = %s;"
-    params = (user_id,)
+    query = f"SELECT webhook_url FROM {TABLE} WHERE business_id = %s;"
+    params = (business_id,)
     
     # Execute the query to get the webhook_url
     result = execute_query(query, params, fetch_all=False)

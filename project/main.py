@@ -33,7 +33,7 @@ def run_task(payload: dict = Body(...), current_user: dict = Depends(verify_toke
     folder_id = payload["folder_id"]
     images = payload.get("images", [])  # Assuming images is a list in the payload
     
-    webhook_url = get_webhook_url(current_user["user_id"])
+    webhook_url = get_webhook_url(current_user["sub"])
 
     task = create_task.delay(folder_id, images, webhook_url)
     return JSONResponse({"task_id": task.id})
@@ -86,6 +86,6 @@ def set_webhook(
     webhook_url: str,
     current_user: dict = Depends(verify_token)
 ):
-    update_webhook_url(user_id=current_user["user_id"], webhook_url=webhook_url)
+    update_webhook_url(user_id=current_user["sub"], webhook_url=webhook_url)
     
     return {"message": "Webhook set successfully"}
