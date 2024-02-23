@@ -60,7 +60,11 @@ def get_status(task_id: str, current_user: dict = Depends(verify_token)):
     return JSONResponse(content=result)
 
 @app.post("/create-token")
-async def create_token(business_id: str, business_api_key: str, secret_key: str):
+async def create_token(
+    business_id: str, 
+    business_api_key: str = Header(..., description="Business API Key"),
+    secret_key: str = Header(..., description="Secret Key")
+):
     query = f"SELECT * FROM {TABLE} WHERE business_id = %s AND business_api_key = %s AND secret_key = %s;"
     params = (business_id, business_api_key, secret_key)
     
