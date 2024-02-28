@@ -238,8 +238,19 @@ def handle_final_result(successful_results, parent_task_id, webhook_url, aws_buc
 
 @celery.task(name="update_final_result")
 def update_final_result(upload_result, final_result):
-    final_result["saved_to"] = upload_result.get('saved_to')
-    final_result["s3_urls"] = upload_result.get('s3_urls')
+    # Wait until upload_result is ready
+    while not upload_result.ready():
+        time.sleep(1)  # Adjust sleep time as needed
+
+    # Check if upload_result is successful and has the expected structure
+    if upload_result.successful() and isinstance(upload_result.result, dict):
+        final_result["saved_to"] = upload_result.result.get('saved_to')
+        final_result["s3_urls"] = upload_result.result.get('s3_urls')
+    else:
+        # Handle the case where upload_result is not successful or has unexpected structure
+        final_result["saved_to"] = "unknown"
+        final_result["s3_urls"] = []
+
     return final_result
 
 
