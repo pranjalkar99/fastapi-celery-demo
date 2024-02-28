@@ -245,6 +245,7 @@ def update_final_result(upload_result, final_result):
         final_result["saved_to"] = upload_result.get('saved_to')
         final_result["s3_urls"] = upload_result.get('s3_urls')
     else:
+        raise Exception("s3 urls not Received")
         # Handle the case where upload_result is not successful or has unexpected structure
         final_result["saved_to"] = "unknown"
         final_result["s3_urls"] = []

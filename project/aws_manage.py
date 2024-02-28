@@ -4,7 +4,9 @@ from dotenv import load_dotenv
 import boto3
 from botocore.exceptions import NoCredentialsError
 load_dotenv()
+import logging
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 
@@ -17,11 +19,11 @@ def upload_to_s3(local_filename, s3_bucket, s3_folder):
     try:
         s3.upload_file(local_filename, s3_bucket, f"{s3_folder}/{os.path.basename(local_filename)}")
         s3_url = f"https://{s3_bucket}.s3.amazonaws.com/{s3_folder}/{os.path.basename(local_filename)}"
-        print(f"Uploaded {local_filename} to {s3_url}")
+        logging.info(f"Uploaded {local_filename} to {s3_url}")
         return s3_url
-    except NoCredentialsError:
-        error_message = "Credentials not available"
-        print(error_message)
+    except NoCredentialsError as e:
+        error_message = f"Credentials not available: {e}"
+        logging.error(error_message)
         raise Exception(error_message)
 
 def upload_images_to_s3(input_folder, output_folder, s3_bucket):
@@ -29,14 +31,17 @@ def upload_images_to_s3(input_folder, output_folder, s3_bucket):
 
     for filename in os.listdir(input_folder):
         local_filepath = os.path.join(input_folder, filename)
-        s3_url = upload_to_s3(local_filepath, s3_bucket, output_folder)
-        if s3_url:
-            s3_urls.append(s3_url)
-        else:
-            error_message = f"Failed to upload {local_filepath} to S3"
-            print(error_message)
-            raise Exception(error_message)
+        try:
+            s3_url = upload_to_s3(local_filepath, s3_bucket, output_folder)
+            if s3_url:
+                s3_urls.append(s3_url)
+            else:
+                error_message = f"Failed to upload {local_filepath} to S3"
+                logging.error(error_message)
+                raise Exception(error_message)
+        except Exception as e:
+            logging.error(f"Error during S3 upload for {local_filepath}: {e}")
+            raise e
 
-
+    logging.info(f"All files in {input_folder} successfully uploaded to S3. URLs: {s3_urls}")
     return s3_urls
-
