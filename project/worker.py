@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+import datetime
 import time
 from typing import List
 import requests, json
@@ -139,7 +139,7 @@ def create_task(folder_id, images: List[str], webhook_url, aws_bucket):
 
 @celery.task(name="upload files")
 def upload_files_completion(input_folder, aws_bucket):
-    output_folder =  f"{input_folder}-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
+    output_folder =  f"{input_folder}-{datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
     try:
         upload_status = upload_images_to_s3(input_folder,output_folder,aws_bucket)
         if upload_status:
