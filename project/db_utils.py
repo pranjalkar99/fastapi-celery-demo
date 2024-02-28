@@ -100,3 +100,16 @@ def get_webhook_url(business_id: str):
     else:
         
         raise HTTPException(status_code=404, detail="Webhook url not configured...")
+
+def get_aws_bucket_name(business_id: str):
+
+    query = f"SELECT aws_bucket FROM {TABLE} WHERE business_id = %s;"
+    params = (business_id,)
+
+    result = execute_query(query, params, fetch_all=False)
+
+    if result:
+        return result[0]  # Assuming the result is a single value (webhook_url)
+    else:
+        
+        raise HTTPException(status_code=404, detail="AWS Bucket not configured...")

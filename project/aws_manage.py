@@ -1,30 +1,36 @@
 import requests
 import os
 from dotenv import load_dotenv
-
+import boto3
+from botocore.exceptions import NoCredentialsError
 load_dotenv()
 
-def download_s3_image(s3_url, local_filename):
+
+
+
+def upload_to_s3(local_filename, s3_bucket, s3_folder):
     access_key = os.getenv('AWS_ACCESS_KEY_ID')
     secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
 
-    # Generate the authorization header
-    auth_header = {'Authorization': f'AWS {access_key}:{secret_key}'}
+    s3 = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_key)
 
-    # Download the image
-    response = requests.get(s3_url, headers=auth_header, stream=True)
+    try:
+        s3.upload_file(local_filename, s3_bucket, f"{s3_folder}/{os.path.basename(local_filename)}")
+        s3_url = f"https://{s3_bucket}.s3.amazonaws.com/{s3_folder}/{os.path.basename(local_filename)}"
+        print(f"Uploaded {local_filename} to {s3_url}")
+        return s3_url
+    except NoCredentialsError:
+        print("Credentials not available")
+        return None
 
-    # Check if the request was successful (status code 200)
-    if response.status_code == 200:
-        # Save the image locally
-        with open(local_filename, 'wb') as file:
-            for chunk in response.iter_content(chunk_size=128):
-                file.write(chunk)
-        print(f"Image downloaded successfully as {local_filename}")
-    else:
-        print(f"Failed to download image. Status code: {response.status_code}")
+def upload_images_to_s3(input_folder, output_folder, s3_bucket):
+    s3_urls = []
 
-# Example usage
-s3_url = 'your_private_s3_url'
-local_filename = 'downloaded_image.jpg'
-download_s3_image(s3_url, local_filename)
+    for filename in os.listdir(input_folder):
+        local_filepath = os.path.join(input_folder, filename)
+        s3_url = upload_to_s3(local_filepath, s3_bucket, output_folder)
+        if s3_url:
+            s3_urls.append(s3_url)
+
+    return s3_urls
+

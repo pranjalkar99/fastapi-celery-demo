@@ -16,3 +16,4 @@ bcrypt
 databases[postgresql]
 python-dotenv
 psycopg2-binary
+boto3

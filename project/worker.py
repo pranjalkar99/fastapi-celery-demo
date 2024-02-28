@@ -8,6 +8,7 @@ from PIL import Image
 import time, logging
 
 from db_utils import *
+from aws_manage import *
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,7 @@ def process_image(folder_id, image, parent_task_id):
 
 
 @celery.task(name="create_task")
-def create_task(folder_id, images: List[str], webhook_url):
+def create_task(folder_id, images: List[str], webhook_url, aws_bucket):
     print(f"Working on {folder_id}")
 
     parent_task_id = create_task.request.id
@@ -127,12 +128,23 @@ def create_task(folder_id, images: List[str], webhook_url):
 
 
     # Create a chord of tasks
-    chord_task = chord(signature_tasks, body=process_task_completed.s(parent_task_id, webhook_url))
+    chord_task = chord(signature_tasks, body=process_task_completed.s(parent_task_id, webhook_url, aws_bucket, folder_id))
 
     # Apply the chord
     chord_task.apply_async()
    
     return parent_task_id
+
+
+@celery.task(name="upload files")
+def upload_files_completion(input_folder, aws_bucket):
+    output_folder = input_folder + str(time)
+    try:
+        upload_status = upload_images_to_s3(input_folder,output_folder,s3_bucket=aws_bucket)
+        if upload_status:
+            return {"status":"success", "saved_to": output_folder, "bucket": aws_bucket, "s3_urls": upload_status}
+    except Exception as e:
+        return {"status":"failed", "msg":str(e)}
 
 
 @celery.task(name="send_discord_message")
@@ -188,7 +200,7 @@ def send_webhook_message(data, webhook_url):
 
 
 @celery.task(name="process_task_completed")
-def process_task_completed(results, parent_task_id, webhook_url):
+def process_task_completed(results, parent_task_id, webhook_url, aws_bucket, folder_id):
     successful_count = 0
     failed_count = 0
     all_image_paths = []
@@ -208,19 +220,42 @@ def process_task_completed(results, parent_task_id, webhook_url):
     # Update your database or do any necessary logging based on the counts
 
     # Optionally, you can store the counts and image paths in the result of the main task
-    result_data = {
+    
+
+    logging.info(f"Result Data: {str(result_data)}")
+
+    #Upload files
+    async_result = upload_files_completion.delay(folder_id, aws_bucket)
+
+    if async_result['status'] == 'success':
+        result_data = {
         "successful_count": successful_count,
         "failed_count": failed_count,
         "all_image_paths": all_image_paths,
         "parent_task_id": parent_task_id,
-    }
+        "saved_to": async_result['output_folder'],
+        "bucket": async_result['aws_bucket'],
+        "s3_urls": async_result['upload_status'],
 
-    logging.info(f"Result Data: {str(result_data)}")
+        }
+    else:
+        result_data = {
+        "successful_count": successful_count,
+        "failed_count": failed_count,
+        "all_image_paths": all_image_paths,
+        "parent_task_id": parent_task_id,
+        }
+        
 
     # Send message to Discord
-    async_result = send_discord_message.delay(result_data)
+    async_result2 = send_discord_message.delay(result_data)
 
-    async_result2 = send_webhook_message.delay(result_data, webhook_url)
+    async_result3 = send_webhook_message.delay(result_data, webhook_url)
+
+    if async_result and async_result2 and async_result3:
+        os.removedirs(folder_id)
+
+    
 
     # logging.info(f"Discord Status:{async_result.get()}" )
 

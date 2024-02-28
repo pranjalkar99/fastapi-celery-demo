@@ -35,7 +35,9 @@ def run_task(payload: dict = Body(...), current_user: dict = Depends(verify_toke
     
     webhook_url = get_webhook_url(current_user["sub"])
 
-    task = create_task.delay(folder_id, images, webhook_url)
+    aws_bucket = get_aws_bucket_name(current_user["sub"])
+
+    task = create_task.delay(folder_id, images, webhook_url, aws_bucket)
     return JSONResponse({"task_id": task.id})
 
 @app.get("/tasks/{task_id}")
