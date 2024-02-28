@@ -81,14 +81,14 @@ async def get_device_stats():
 
 @app.get("/", dependencies=[Depends(authenticate)], response_class=HTMLResponse)
 async def home(request: Request):
-    device_stats = await get_device_stats()
+    # device_stats = await get_device_stats()
     logs_content = read_alllogs()
 
     return templates.TemplateResponse(
         "home.html",
         context={
             "request": request,
-            "device_stats": json.dumps(device_stats),
+            # "device_stats": json.dumps(device_stats),
             "logs_content": logs_content
         }
     )
