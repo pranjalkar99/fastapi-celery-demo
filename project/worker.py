@@ -12,7 +12,7 @@ from aws_manage import *
 
 logger = logging.getLogger(__name__)
 
-from celery import Celery, group, chord
+from celery import Celery, group, chord, chain
 import random
 from celery.result import AsyncResult
 
@@ -128,7 +128,7 @@ def create_task(folder_id, images: List[str], webhook_url, aws_bucket):
 
 
     # Create a chord of tasks
-    chord_task = chord(signature_tasks, body=process_task_completed.s(parent_task_id, webhook_url, aws_bucket, folder_id))
+    chord_task = chord(signature_tasks, body=images_processed.s(parent_task_id, webhook_url, aws_bucket, folder_id))
 
     # Apply the chord
     chord_task.apply_async()
@@ -197,8 +197,53 @@ def send_webhook_message(data, webhook_url):
 
 
 
+
+@celery.task(name="finalize_task")
+def finalize_task(final_result, folder_id):
+    # Check if all tasks were successful before removing the directory
+    if final_result.get('status') == 'success':
+        os.removedirs(folder_id)
+
+    logging.info(f"Final Result Data: {str(final_result)}")
+
+    return final_result
+
+
+@celery.task(name="handle_final_result")
+def handle_final_result(successful_results, parent_task_id, webhook_url, aws_bucket, folder_id):
+    # Assuming successful_results is a list of successful results
+    final_result = {
+        "successful_count": len(successful_results),
+        "failed_count": 0,  # Assuming no failures in this step
+        "all_image_paths": [result.get("image_path") for result in successful_results],
+        "parent_task_id": parent_task_id,
+        "saved_to": "some_path",  # Replace with the actual path
+        "bucket": aws_bucket,
+        "s3_urls": ["url1", "url2"],  # Replace with the actual URLs
+    }
+
+    # Send message to Discord
+    async_result2 = send_discord_message.delay(final_result)
+
+    # Send message to Webhook
+    async_result3 = send_webhook_message.delay(final_result, webhook_url)
+
+    # Chain the cleanup steps after async_result2 and async_result3
+    cleanup_chain = chain(
+        async_result2,  # Using the result of async_result2 as a link in the chain
+        async_result3,  # Using the result of async_result3 as a link in the chain
+        finalize_task.s(final_result, folder_id)
+    )
+
+    # Execute the cleanup_chain
+    cleanup_chain.apply_async()
+
+    return final_result
+
+
+
 @celery.task(name="process_task_completed")
-def process_task_completed(results, parent_task_id, webhook_url, aws_bucket, folder_id):
+def images_processed(results, parent_task_id, webhook_url, aws_bucket, folder_id):
     successful_count = 0
     failed_count = 0
     all_image_paths = []
@@ -222,38 +267,13 @@ def process_task_completed(results, parent_task_id, webhook_url, aws_bucket, fol
     logging.info(f"Successfully processed {successful_count} images.")
     logging.info(f"Failed to process {failed_count} images.")
 
-    # Define the callback to handle the final result
-    def handle_final_result(results):
-        final_result = {
-            "successful_count": successful_count,
-            "failed_count": failed_count,
-            "all_image_paths": all_image_paths,
-            "parent_task_id": parent_task_id,
-            "saved_to": results[0].get('saved_to'),
-            "bucket": results[0].get('bucket'),
-            "s3_urls": results[0].get('s3_urls'),
-        }
-
-        # Send message to Discord
-        async_result2 = send_discord_message.delay(final_result)
-
-        # Send message to Webhook
-        async_result3 = send_webhook_message.delay(final_result, webhook_url)
-
-        # Wait for async_result2 and async_result3 to complete
-        async_result2.get()
-        async_result3.get()
-
-        # Check if all tasks were successful before removing the directory
-        if results[0].get('status') == 'success' and async_result2.successful() and async_result3.successful():
-            os.removedirs(folder_id)
-
-        logging.info(f"Final Result Data: {str(final_result)}")
-
-    # Create a chord with the upload_files_completion and handle_final_result
-    chord(
-        (upload_files_completion.s(folder_id, aws_bucket) | group(send_discord_message.s(), send_webhook_message.s(webhook_url))),
-        handle_final_result.s()
+    # Send the successful results to the next task
+    async_result = handle_final_result.s(
+        successful_results,
+        parent_task_id,
+        webhook_url,
+        aws_bucket,
+        folder_id
     ).delay()
 
     # Return a placeholder response if needed
