@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import Optional
 from fastapi import Depends, FastAPI,Header, HTTPException, status
+from fastapi.responses import HTMLResponse
+import psutil,json
 
 load_dotenv()
 from db_utils import *
@@ -23,9 +25,77 @@ templates = Jinja2Templates(directory="templates")
 
 TABLE = os.getenv('TABLE_NAME')
 
-@app.get("/")
-def home(request: Request):
-    return templates.TemplateResponse("home.html", context={"request": request})
+import os
+
+def read_alllogs():
+    logs_folder_path = "logs"  # Adjust the path accordingly
+    logs_content = ""
+
+    try:
+        for filename in os.listdir(logs_folder_path):
+            if filename.endswith(".log") or filename.endswith(".txt"):
+                file_path = os.path.join(logs_folder_path, filename)
+                with open(file_path, "r") as file:
+                    logs_content += f"\n=== {filename} ===\n\n"
+                    logs_content += file.read()
+    except FileNotFoundError:
+        return "Logs folder not found"
+    except Exception as e:
+        return f"Error reading logs: {str(e)}"
+
+    return logs_content
+    
+
+@app.get("/device-stats", response_class=JSONResponse)
+async def get_device_stats():
+    # Get CPU usage
+    cpu_usage = psutil.cpu_percent()
+
+    # Get memory usage
+    memory = psutil.virtual_memory()
+    memory_usage = {
+        "total": memory.total,
+        "available": memory.available,
+        "used": memory.used,
+        "percent": memory.percent
+    }
+
+    # Get disk space
+    disk = psutil.disk_usage("/")
+    disk_space = {
+        "total": disk.total,
+        "used": disk.used,
+        "free": disk.free,
+        "percent": disk.percent
+    }
+
+    device_stats = {
+        "CPU Usage": f"{cpu_usage}%",
+        "Memory Usage": memory_usage,
+        "Disk Space": disk_space
+    }
+
+    return device_stats
+
+
+
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    
+    device_stats = get_device_stats()
+    logs_content = read_alllogs()
+
+    return templates.TemplateResponse(
+        "home.html",
+        context={
+            "request": request,
+            "device_stats": json.dumps(device_stats),
+            "logs_content": logs_content
+        }
+    )
+
+
+
 
 
 @app.post("/tasks", status_code=201)

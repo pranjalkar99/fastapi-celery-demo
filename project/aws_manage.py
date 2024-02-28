@@ -5,8 +5,8 @@ import boto3
 from botocore.exceptions import NoCredentialsError
 load_dotenv()
 import logging
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+log_file_path = 'celery_logs_aws.log'
+logging.basicConfig(filename=log_file_path,level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 
