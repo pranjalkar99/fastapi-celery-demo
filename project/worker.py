@@ -1,4 +1,5 @@
-import os, datetime
+import os
+from datetime import datetime
 import time
 from typing import List
 import requests, json
@@ -138,9 +139,9 @@ def create_task(folder_id, images: List[str], webhook_url, aws_bucket):
 
 @celery.task(name="upload files")
 def upload_files_completion(input_folder, aws_bucket):
-    output_folder = input_folder + str(time)
+    output_folder =  f"{input_folder}-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
     try:
-        upload_status = f"{input_folder}-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
+        upload_status = upload_images_to_s3(input_folder,output_folder,aws_bucket)
         if upload_status:
             return {"status":"success", "saved_to": output_folder, "bucket": aws_bucket, "s3_urls": upload_status}
     except Exception as e:
@@ -224,8 +225,8 @@ def handle_final_result(successful_results, parent_task_id, webhook_url, aws_buc
     cleanup_chain = chain(
         upload_files_completion.s(folder_id, aws_bucket),
         update_final_result.s(final_result),
-        send_discord_message.s(final_result),
-        send_webhook_message.s(final_result, webhook_url),
+        send_discord_message.s(),
+        send_webhook_message.s(webhook_url),
         finalize_task.s(folder_id)
     )
 
