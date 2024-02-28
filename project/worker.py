@@ -208,7 +208,6 @@ def finalize_task(final_result, folder_id):
 
     return final_result
 
-
 @celery.task(name="handle_final_result")
 def handle_final_result(successful_results, parent_task_id, webhook_url, aws_bucket, folder_id):
     # Assuming successful_results is a list of successful results
@@ -217,29 +216,30 @@ def handle_final_result(successful_results, parent_task_id, webhook_url, aws_buc
         "failed_count": 0,  # Assuming no failures in this step
         "all_image_paths": [result.get("image_path") for result in successful_results],
         "parent_task_id": parent_task_id,
-        "saved_to": "some_path",  # Replace with the actual path
         "bucket": aws_bucket,
-        "s3_urls": ["url1", "url2"],  # Replace with the actual URLs
     }
 
-    # Send message to Discord
-    async_result2 = send_discord_message.delay(final_result)
-
-    # Send message to Webhook
-    async_result3 = send_webhook_message.delay(final_result, webhook_url)
-
-    # Chain the cleanup steps after async_result2 and async_result3
+    # Create a chord with the tasks: upload_files_completion -> update_final_result
+    # -> send_discord_message -> send_webhook_message -> finalize_task
     cleanup_chain = chain(
-        async_result2,  # Using the result of async_result2 as a link in the chain
-        async_result3,  # Using the result of async_result3 as a link in the chain
-        finalize_task.s(final_result, folder_id)
+        upload_files_completion.s(folder_id, aws_bucket),
+        update_final_result.s(final_result),
+        send_discord_message.s(final_result),
+        send_webhook_message.s(final_result, webhook_url),
+        finalize_task.s(folder_id)
     )
 
-    # Execute the cleanup_chain
+    # Apply async to the entire cleanup_chord
     cleanup_chain.apply_async()
 
     return final_result
 
+
+@celery.task(name="update_final_result")
+def update_final_result(upload_result, final_result):
+    final_result["saved_to"] = upload_result.get('saved_to')
+    final_result["s3_urls"] = upload_result.get('s3_urls')
+    return final_result
 
 
 @celery.task(name="process_task_completed")
@@ -277,4 +277,4 @@ def images_processed(results, parent_task_id, webhook_url, aws_bucket, folder_id
     ).delay()
 
     # Return a placeholder response if needed
-    return {"status": "processing", "message": "Task is still in progress"}
+    return {"status": "processing images completed,", "message": "Task is still in progress"}
