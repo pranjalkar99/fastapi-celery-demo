@@ -15,7 +15,7 @@ CLIENT_ACCESS_KEY = os.getenv('CLIENT_ACCESS_KEY')
 def authenticate( credentials: HTTPBasicCredentials = Depends(security),):
     # Check if username is already registered
 
-    if credentials.client_access_id != CLIENT_ACCESS_ID or credentials.client_access_key != CLIENT_ACCESS_KEY:
+    if credentials.username  != CLIENT_ACCESS_ID or credentials.password  != CLIENT_ACCESS_KEY:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
