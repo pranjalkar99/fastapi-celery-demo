@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import Optional
+from utils import *
 from fastapi import Depends, FastAPI,Header, HTTPException, status
 from fastapi.responses import HTMLResponse
 import psutil,json
@@ -46,7 +47,7 @@ def read_alllogs():
     return logs_content
     
 
-@app.get("/device-stats", response_class=JSONResponse)
+@app.get("/device-stats", dependencies=[Depends(authenticate)], response_class=JSONResponse)
 async def get_device_stats():
     # Get CPU usage
     cpu_usage = psutil.cpu_percent()
@@ -78,11 +79,9 @@ async def get_device_stats():
     return device_stats
 
 
-
-@app.get("/", response_class=HTMLResponse)
+@app.get("/", dependencies=[Depends(authenticate)], response_class=HTMLResponse)
 async def home(request: Request):
-    
-    device_stats = get_device_stats()
+    device_stats = await get_device_stats()
     logs_content = read_alllogs()
 
     return templates.TemplateResponse(
@@ -93,7 +92,6 @@ async def home(request: Request):
             "logs_content": logs_content
         }
     )
-
 
 
 
