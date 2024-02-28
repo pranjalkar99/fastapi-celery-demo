@@ -197,8 +197,6 @@ def send_webhook_message(data, webhook_url):
 
 
 
-
-
 @celery.task(name="process_task_completed")
 def process_task_completed(results, parent_task_id, webhook_url, aws_bucket, folder_id):
     successful_count = 0
@@ -214,56 +212,53 @@ def process_task_completed(results, parent_task_id, webhook_url, aws_bucket, fol
                 all_image_paths.append(image_path)
         elif image_status == "error":
             failed_count += 1
-           
 
     logging.info(f"Successfully processed {successful_count} images.")
     logging.info(f"Failed to process {failed_count} images.")
 
-    
-    # logging.info(f"Result Data: {str(result_data)}")
-
-    #Upload files
+    # Upload files
     async_result = upload_files_completion.delay(folder_id, aws_bucket)
-    upload_result = async_result.get()
 
+    # Wait for the upload_files_completion task to complete
+    async_result.get()
+
+    # Get the result of upload_files_completion
+    upload_result = async_result.result
 
     if upload_result.get('status') == 'success':
         result_data = {
-        "successful_count": successful_count,
-        "failed_count": failed_count,
-        "all_image_paths": all_image_paths,
-        "parent_task_id": parent_task_id,
-         "saved_to": upload_result.get('saved_to'),
-        "bucket": upload_result.get('bucket'),
-        "s3_urls": upload_result.get('s3_urls'),
-
+            "successful_count": successful_count,
+            "failed_count": failed_count,
+            "all_image_paths": all_image_paths,
+            "parent_task_id": parent_task_id,
+            "saved_to": upload_result.get('saved_to'),
+            "bucket": upload_result.get('bucket'),
+            "s3_urls": upload_result.get('s3_urls'),
         }
     else:
         result_data = {
-        "successful_count": successful_count,
-        "failed_count": failed_count,
-        "all_image_paths": all_image_paths,
-        "parent_task_id": parent_task_id,
+            "successful_count": successful_count,
+            "failed_count": failed_count,
+            "all_image_paths": all_image_paths,
+            "parent_task_id": parent_task_id,
         }
-        
 
     # Send message to Discord
     async_result2 = send_discord_message.delay(result_data)
 
+    # Wait for the send_discord_message task to complete
+    async_result2.get()
+
+    # Send message to Webhook
     async_result3 = send_webhook_message.delay(result_data, webhook_url)
 
-    discord_result = async_result2.get()
-    webhook_result = async_result3.get()
+    # Wait for the send_webhook_message task to complete
+    async_result3.get()
 
-    logging.info(f"Discord Status: {discord_result}")
-    logging.info(f"Webhook Status: {webhook_result}")
-
+    # Check if all tasks were successful before removing the directory
     if async_result.successful() and async_result2.successful() and async_result3.successful():
         os.removedirs(folder_id)
+
     logging.info(f"Final Result Data: {str(result_data)}")
-
-    
-
-    # logging.info(f"Discord Status:{async_result.get()}" )
 
     return result_data
