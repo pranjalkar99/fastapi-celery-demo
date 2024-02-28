@@ -203,6 +203,10 @@ def process_task_completed(results, parent_task_id, webhook_url, aws_bucket, fol
     failed_count = 0
     all_image_paths = []
 
+    # Extract successful and failed results
+    successful_results = []
+    failed_results = []
+
     for result in results:
         image_status = result.get("image_status")
         if image_status == "success":
@@ -210,55 +214,47 @@ def process_task_completed(results, parent_task_id, webhook_url, aws_bucket, fol
             image_path = result.get("image_path")
             if image_path:
                 all_image_paths.append(image_path)
+            successful_results.append(result)
         elif image_status == "error":
             failed_count += 1
+            failed_results.append(result)
 
     logging.info(f"Successfully processed {successful_count} images.")
     logging.info(f"Failed to process {failed_count} images.")
 
-    # Upload files
-    async_result = upload_files_completion.delay(folder_id, aws_bucket)
-
-    # Wait for the upload_files_completion task to complete
-    async_result.get()
-
-    # Get the result of upload_files_completion
-    upload_result = async_result.result
-
-    if upload_result.get('status') == 'success':
-        result_data = {
+    # Define the callback to handle the final result
+    def handle_final_result(results):
+        final_result = {
             "successful_count": successful_count,
             "failed_count": failed_count,
             "all_image_paths": all_image_paths,
             "parent_task_id": parent_task_id,
-            "saved_to": upload_result.get('saved_to'),
-            "bucket": upload_result.get('bucket'),
-            "s3_urls": upload_result.get('s3_urls'),
-        }
-    else:
-        result_data = {
-            "successful_count": successful_count,
-            "failed_count": failed_count,
-            "all_image_paths": all_image_paths,
-            "parent_task_id": parent_task_id,
+            "saved_to": results[0].get('saved_to'),
+            "bucket": results[0].get('bucket'),
+            "s3_urls": results[0].get('s3_urls'),
         }
 
-    # Send message to Discord
-    async_result2 = send_discord_message.delay(result_data)
+        # Send message to Discord
+        async_result2 = send_discord_message.delay(final_result)
 
-    # Wait for the send_discord_message task to complete
-    async_result2.get()
+        # Send message to Webhook
+        async_result3 = send_webhook_message.delay(final_result, webhook_url)
 
-    # Send message to Webhook
-    async_result3 = send_webhook_message.delay(result_data, webhook_url)
+        # Wait for async_result2 and async_result3 to complete
+        async_result2.get()
+        async_result3.get()
 
-    # Wait for the send_webhook_message task to complete
-    async_result3.get()
+        # Check if all tasks were successful before removing the directory
+        if results[0].get('status') == 'success' and async_result2.successful() and async_result3.successful():
+            os.removedirs(folder_id)
 
-    # Check if all tasks were successful before removing the directory
-    if async_result.successful() and async_result2.successful() and async_result3.successful():
-        os.removedirs(folder_id)
+        logging.info(f"Final Result Data: {str(final_result)}")
 
-    logging.info(f"Final Result Data: {str(result_data)}")
+    # Create a chord with the upload_files_completion and handle_final_result
+    chord(
+        (upload_files_completion.s(folder_id, aws_bucket) | group(send_discord_message.s(), send_webhook_message.s(webhook_url))),
+        handle_final_result.s()
+    ).delay()
 
-    return result_data
+    # Return a placeholder response if needed
+    return {"status": "processing", "message": "Task is still in progress"}
