@@ -1,23 +1,22 @@
-{% extends "_base.html" %}
-
-{% block content %}
+{% extends "_base.html" %} {% block content %}
 
 <div class="starter-template">
   <h1>FastAPI + Celery + Docker</h1>
-  <hr><br>
-  
+  <hr />
+  <br />
+
   <!-- Display Device Stats -->
   <div>
     <h3>Device Stats</h3>
-    <p>{{ device_stats }}</p>
-    
+    <!-- Display Device Stats  <p>{{ device_stats }}</p> -->
+
     <!-- Doughnut Chart for CPU Usage -->
     <canvas id="cpuChart" width="400" height="400"></canvas>
   </div>
-  <br><br>
+  <br /><br />
 
   <!-- Display Logs -->
-   <div class="container">
+  <div class="container">
     <h3>Logs</h3>
     <div class="card">
       <div class="card-body">
@@ -25,33 +24,33 @@
       </div>
     </div>
   </div>
-  <br><br>
-  <br><br>
+  <br /><br />
+  <br /><br />
 
   <!-- Task Buttons -->
-  
-  <br><br>
+
+  <br /><br />
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   // Draw Doughnut Chart for CPU Usage
-  var cpuChartCanvas = document.getElementById('cpuChart').getContext('2d');
-  var cpuChartData = {
-    labels: ['Used', 'Free'],
-    datasets: [{
-      data: [{{ device_stats['CPU Usage'].split('%')[0] }}, 100 - {{ device_stats['CPU Usage'].split('%')[0] }}],
-      backgroundColor: ['#FF6384', '#36A2EB'],
-      hoverBackgroundColor: ['#FF6384', '#36A2EB']
-    }]
-  };
-
-  var cpuDoughnutChart = new Chart(cpuChartCanvas, {
-    type: 'doughnut',
-    data: cpuChartData
-  });
-
-  // ... your other JavaScript code ...
+  // var cpuChartCanvas = document.getElementById('cpuChart').getContext('2d');
+  // var cpuChartData = {
+  //   labels: ['Used', 'Free'],
+  //   datasets: [{
+  //     data: [{{ device_stats['CPU Usage'].split('%')[0] }}, 100 - {{ device_stats['CPU Usage'].split('%')[0] }}],
+  //     backgroundColor: ['#FF6384', '#36A2EB'],
+  //     hoverBackgroundColor: ['#FF6384', '#36A2EB']
+  //   }]
+  // };
+  //
+  // var cpuDoughnutChart = new Chart(cpuChartCanvas, {
+  //   type: 'doughnut',
+  //   data: cpuChartData
+  // });
+  //
+  // // ... your other JavaScript code ...
 </script>
 
 {% endblock %}
