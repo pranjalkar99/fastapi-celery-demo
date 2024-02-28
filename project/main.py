@@ -39,6 +39,13 @@ def read_alllogs():
                 with open(file_path, "r") as file:
                     logs_content += f"\n=== {filename} ===\n\n"
                     logs_content += file.read()
+
+        for filename in os.listdir(os.curdir):
+            if filename.endswith(".log") or filename.endswith(".txt"):
+                file_path = os.path.join(logs_folder_path, filename)
+                with open(file_path, "r") as file:
+                    logs_content += f"\n=== {filename} ===\n\n"
+                    logs_content += file.read()
     except FileNotFoundError:
         return "Logs folder not found"
     except Exception as e:
