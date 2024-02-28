@@ -239,7 +239,7 @@ def handle_final_result(successful_results, parent_task_id, webhook_url, aws_buc
 @celery.task(name="update_final_result")
 def update_final_result(upload_result, final_result):
     # Wait until upload_result is ready
-    while not upload_result.ready():
+    while upload_result is None or not upload_result.ready():
         time.sleep(1)  # Adjust sleep time as needed
 
     # Check if upload_result is successful and has the expected structure
