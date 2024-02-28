@@ -20,8 +20,9 @@ def upload_to_s3(local_filename, s3_bucket, s3_folder):
         print(f"Uploaded {local_filename} to {s3_url}")
         return s3_url
     except NoCredentialsError:
-        print("Credentials not available")
-        return None
+        error_message = "Credentials not available"
+        print(error_message)
+        raise Exception(error_message)
 
 def upload_images_to_s3(input_folder, output_folder, s3_bucket):
     s3_urls = []
@@ -31,6 +32,11 @@ def upload_images_to_s3(input_folder, output_folder, s3_bucket):
         s3_url = upload_to_s3(local_filepath, s3_bucket, output_folder)
         if s3_url:
             s3_urls.append(s3_url)
+        else:
+            error_message = f"Failed to upload {local_filepath} to S3"
+            print(error_message)
+            raise Exception(error_message)
+
 
     return s3_urls
 

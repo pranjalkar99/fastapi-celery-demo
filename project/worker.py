@@ -220,18 +220,15 @@ def handle_final_result(successful_results, parent_task_id, webhook_url, aws_buc
         "bucket": aws_bucket,
     }
 
-    # Create a chord with the tasks: upload_files_completion -> update_final_result
-    # -> send_discord_message -> send_webhook_message -> finalize_task
-    cleanup_chain = chain(
-        upload_files_completion.s(folder_id, aws_bucket),
-        update_final_result.s(final_result),
-        send_discord_message.s(),
-        send_webhook_message.s(webhook_url),
-        finalize_task.s(folder_id)
-    )
+    # Do these two tasks synchronously...
 
-    # Apply async to the entire cleanup_chord
-    cleanup_chain.apply_async()
+    upload_result = upload_files_completion(folder_id, aws_bucket)
+    final_result = update_final_result(upload_result, final_result)
+
+    send_discord_message.delay(final_result)
+    send_webhook_message.delay(final_result, webhook_url)
+    finalize_task.delay(final_result, folder_id)
+
 
     return final_result
 
@@ -239,8 +236,7 @@ def handle_final_result(successful_results, parent_task_id, webhook_url, aws_buc
 @celery.task(name="update_final_result")
 def update_final_result(upload_result, final_result):
     # Wait until upload_result is ready
-    while upload_result is None or not upload_result.ready():
-        time.sleep(1)  # Adjust sleep time as needed
+    
 
     # Check if upload_result is successful and has the expected structure
     if upload_result.successful() and isinstance(upload_result.result, dict):
