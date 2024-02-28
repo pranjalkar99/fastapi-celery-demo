@@ -88,7 +88,7 @@ async def home(request: Request):
         "home.html",
         context={
             "request": request,
-            # "device_stats": json.dumps(device_stats),
+                # "device_stats": json.dumps(device_stats),
             "logs_content": logs_content
         }
     )
