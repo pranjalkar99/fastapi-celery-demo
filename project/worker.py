@@ -1,4 +1,4 @@
-import os
+import os, datetime
 import time
 from typing import List
 import requests, json
@@ -140,7 +140,7 @@ def create_task(folder_id, images: List[str], webhook_url, aws_bucket):
 def upload_files_completion(input_folder, aws_bucket):
     output_folder = input_folder + str(time)
     try:
-        upload_status = upload_images_to_s3(input_folder,output_folder,s3_bucket=aws_bucket)
+        upload_status = f"{input_folder}-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
         if upload_status:
             return {"status":"success", "saved_to": output_folder, "bucket": aws_bucket, "s3_urls": upload_status}
     except Exception as e:
@@ -206,36 +206,36 @@ def process_task_completed(results, parent_task_id, webhook_url, aws_bucket, fol
     all_image_paths = []
 
     for result in results:
-        if "image_status" in result and result["image_status"] == "success":
+        image_status = result.get("image_status")
+        if image_status == "success":
             successful_count += 1
-            if "image_path" in result:
-                all_image_paths.append(result["image_path"])
-        elif "image_status" in result and result["image_status"] == "error":
+            image_path = result.get("image_path")
+            if image_path:
+                all_image_paths.append(image_path)
+        elif image_status == "error":
             failed_count += 1
-            # Handle error case, you may log or perform additional actions
+           
 
     logging.info(f"Successfully processed {successful_count} images.")
     logging.info(f"Failed to process {failed_count} images.")
 
-    # Update your database or do any necessary logging based on the counts
-
-    # Optionally, you can store the counts and image paths in the result of the main task
     
-
-    logging.info(f"Result Data: {str(result_data)}")
+    # logging.info(f"Result Data: {str(result_data)}")
 
     #Upload files
     async_result = upload_files_completion.delay(folder_id, aws_bucket)
+    upload_result = async_result.get()
 
-    if async_result['status'] == 'success':
+
+    if upload_result.get('status') == 'success':
         result_data = {
         "successful_count": successful_count,
         "failed_count": failed_count,
         "all_image_paths": all_image_paths,
         "parent_task_id": parent_task_id,
-        "saved_to": async_result['output_folder'],
-        "bucket": async_result['aws_bucket'],
-        "s3_urls": async_result['upload_status'],
+         "saved_to": upload_result.get('saved_to'),
+        "bucket": upload_result.get('bucket'),
+        "s3_urls": upload_result.get('s3_urls'),
 
         }
     else:
@@ -252,8 +252,15 @@ def process_task_completed(results, parent_task_id, webhook_url, aws_bucket, fol
 
     async_result3 = send_webhook_message.delay(result_data, webhook_url)
 
-    if async_result and async_result2 and async_result3:
+    discord_result = async_result2.get()
+    webhook_result = async_result3.get()
+
+    logging.info(f"Discord Status: {discord_result}")
+    logging.info(f"Webhook Status: {webhook_result}")
+
+    if async_result.successful() and async_result2.successful() and async_result3.successful():
         os.removedirs(folder_id)
+    logging.info(f"Final Result Data: {str(result_data)}")
 
     
 
