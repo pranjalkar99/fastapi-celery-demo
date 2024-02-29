@@ -11,6 +11,7 @@ import time, logging
 from db_utils import *
 from aws_manage import *
 
+logging.basicConfig(filename='logs/worker.log', level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 from celery import Celery, group, chord, chain
@@ -38,12 +39,12 @@ def save_image(base64_image, folder_id, model, aws_bucket, s3_folder_name):
 
     try:
         image.save(image_path, 'JPEG')
-        print(f"Image saved successfully: {image_path}")
+        logger.info(f"Image saved successfully: {image_path}")
     except Exception as e:
-        print(f"Error saving image: {str(e)}")
-
-    
-
+        logger.error(f"Error saving image: {str(e)}")
+        # Re-raise the exception to propagate the error
+        raise
+    logger.info("Processing success, now going for upload...")
     s3_url = upload_to_s3(image_path, aws_bucket, s3_folder_name)
 
     return image_path, s3_url 
@@ -230,7 +231,7 @@ def finalize_task(final_result, folder_id):
     if final_result.get('batch_status') == 'success':
         os.removedirs(folder_id)
 
-    logging.info(f"Final Result Data: {str(final_result)}")
+    logger.info(f"Final Result Data: {str(final_result)}")
 
     return final_result
 
@@ -313,9 +314,9 @@ def images_processed(results, parent_task_id, webhook_url, folder_id, aws_bucket
         elif image_status == "error":
             error_count += 1
 
-    logging.info(f"Successfully processed {successful_count} images.")
-    logging.info(f"Failed to process {failed_count} images.")
-    logging.info(f"Error count: {error_count}")
+    logger.info(f"Successfully processed {successful_count} images.")
+    logger.info(f"Failed to process {failed_count} images.")
+    logger.info(f"Error count: {error_count}")
 
     # Send the successful results to the next task
     async_result = handle_final_result.s(

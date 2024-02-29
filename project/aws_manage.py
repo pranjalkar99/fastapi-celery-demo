@@ -5,6 +5,7 @@ import boto3
 from botocore.exceptions import NoCredentialsError
 load_dotenv()
 import logging
+logging.basicConfig(filename='logs/aws_manage.log', level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -12,10 +13,12 @@ def upload_to_s3(local_filename, s3_bucket, s3_folder):
     access_key = os.getenv('AWS_ACCESS_KEY_ID')
     secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
 
+    
     s3 = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_key)
 
     try:
         s3.upload_file(local_filename, s3_bucket, f"{s3_folder}/{os.path.basename(local_filename)}")
+        logger.info('s3 upload success')
         s3_url = f"https://{s3_bucket}.s3.amazonaws.com/{s3_folder}/{os.path.basename(local_filename)}"
         logger.info(f"Uploaded {local_filename} to {s3_url}")
         return s3_url
