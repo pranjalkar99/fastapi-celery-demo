@@ -104,7 +104,6 @@ def run_task(payload: dict = Body(...), current_user: dict = Depends(verify_toke
     images = payload.get("images", [])  # Assuming images is a list in the payload
     
     webhook_url = get_webhook_url(current_user["sub"])
-
     aws_bucket = get_aws_bucket_name(current_user["sub"])
 
     task = create_task.delay(folder_id, images, webhook_url, aws_bucket)

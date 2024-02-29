@@ -1,5 +1,6 @@
-import os
+import os, shutil
 import datetime
+import traceback
 import time
 from typing import List
 import requests, json
@@ -13,9 +14,7 @@ from aws_manage import *
 
 logging.basicConfig(filename='logs/worker.log', format='%(asctime)s %(message)s',
                     filemode='w')
-logger = logging.getLogger()
-
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 from celery import Celery, group, chord, chain
 import random
@@ -26,44 +25,40 @@ celery.conf.broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:
 celery.conf.result_backend = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379")
 
 
-
-def save_image(base64_image, folder_id, model, aws_bucket, s3_folder_name):
-    timestamp = int(time.time())
-
-    # Check if the folder exists, if not, create it
-    current_directory = os.getcwd()
-    folder_path = os.path.join(current_directory, folder_id)
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
-    
-
-    image_data = base64.b64decode(base64_image.split(',')[1])
-    image = Image.open(BytesIO(image_data))
-
-    image_name = f'output_image_{model}_{timestamp}.jpg'
-    image_path = os.path.join(folder_path, image_name)
-
-    try:
-        image.save(image_path, 'JPEG')
-        logger.info(f"Image saved successfully: {image_path}")
-    except Exception as e:
-        logger.error(f"Error saving image: {str(e)}")
-        # Re-raise the exception to propagate the error
-        raise
-    logger.info("Processing success, now going for upload...")
-    s3_url = upload_to_s3(image_path, aws_bucket, s3_folder_name)
-
-    return image_path, s3_url 
-
-
+@celery.task(name="save_and_upload")
+def save_and_upload(processed_image, folder_id, aws_bucket, s3_folder_name, parent_task_id):
+    if processed_image:
+        # Use processed_image to save and upload
+        image_path, s3_url = save_image(processed_image, folder_id, model="bread", aws_bucket=aws_bucket,
+                                       s3_folder_name=s3_folder_name)
+        celery.current_task.update_state(state='PROGRESS',
+                                             meta={'image_filename': image_path, 'status': 'saving_and_uploading'})
+        logger.info("completed save_image...")
+        # Check if save_image is successful
+        if s3_url:
+            celery.current_task.update_state(state='SUCCESS',
+                                                 meta={'image_filename': image_path, 'status': 'success',
+                                                       "parent": parent_task_id, "s3_urls": s3_url})
+            return {"status": "success", "image_path": image_path, "s3_urls": s3_url}
+        else:
+            celery.current_task.update_state(state='FAILURE',
+                                                 meta={'image_filename': image_path, 'status': 'fail',
+                                                       "parent": parent_task_id,
+                                                       "reason": "Image Processed, but Failing to Upload ..."})
+            return {"status": "fail", "image_path": image_path}
+    else:
+        celery.current_task.update_state(state='FAILURE',
+                                                 meta={ 'status': 'fail',
+                                                       "parent": parent_task_id,
+                                                       "reason": "Image  Not Processed,hence not saving and uploading ..."})
+        return {"status": "fail"}
 
 @celery.task(name="process_image")
 def process_image(folder_id, image, parent_task_id, aws_bucket, s3_folder_name):
     # This is the classification logic...
 
-    # container_choices = ["http://localhost:8084", "http://localhost:5001"]
-    container_choices = ["http://34.138.136.100:8084","http://34.138.136.100:5001"]
-    selected_container ="http://34.138.136.100:8084"# random.choice(container_choices)
+    container_choices = ["http://34.138.136.100:8084", "http://34.138.136.100:5001"]
+    selected_container = "http://34.138.136.100:8084"  # random.choice(container_choices)
 
     # Make a request to the selected container
 
@@ -76,29 +71,23 @@ def process_image(folder_id, image, parent_task_id, aws_bucket, s3_folder_name):
         try:
             celery.current_task.update_state(state='PROGRESS', meta={'image_filename': image, 'status': 'Processing'})
             response = requests.post(endpoint_url, json=payload)
-            
-            if response.status_code == 200:
-                logger.info(f"Image {image} processed successfully by container {selected_container}")
-                print(f"Image {image} processed successfully by container {selected_container}")
 
-                image_path, s3_urls = save_image(response.json()['output'], folder_id, model="bread",aws_bucket=aws_bucket,s3_folder_name=s3_folder_name)
-                if s3_urls:
-                    celery.current_task.update_state(state='SUCCESS', meta={'image_filename': image, 'status': 'success', "parent": parent_task_id, "s3_urls": s3_urls})
-                    return {"status": "success", "image_path": image_path, "s3_urls":s3_urls}
-                
-                else:
-                    celery.current_task.update_state(state='FAILURE', meta={'image_filename': image, 'status': 'fail', "parent": parent_task_id,"reason":"Image Processed, but Failing to Upload ..."})
-                    return {"status": "fail", "image_path": image_path}
-                
+            if response.status_code == 200:
+                logger.info(f"processing here..Image {image} processed successfully by container {selected_container}")
+                print(f"Image {image} processed successfully by container {selected_container} I got response code 200..")
+
+                # Return the processed image data
+                logger.info('Simply returning the code..')
+                return response.json()['output']
             else:
                 print(f"Error processing image {image} by container {selected_container}")
                 logger.error(f"Error processing image {image} by container {selected_container}")
-                return False
+                # Return None if processing fails
+                return None
         except Exception as e:
             print(f"Exception while processing image {image} by container {selected_container}: {str(e)}")
-            celery.current_task.update_state(state='FAILURE', meta={'image_filename': image, 'status': 'Error', 'error_message': str(e)})
-            return {"status": "error", "error_message": str(e)}
-
+            # Return None if an exception occurs during processing
+            return None
     # else:
     #     print("Request for Hdrnet")
     #     hdrnet_endpoint_url = f"{selected_container}/process-batch-interface"  # Adjust the endpoint accordingly
@@ -141,7 +130,8 @@ def create_task(folder_id, images: List[str], webhook_url, aws_bucket):
     for image in images:
         # Use signature for each process_image task
         task = process_image.s(folder_id, image, parent_task_id, aws_bucket, s3_folder_name)
-        signature_tasks.append(task)
+        chain_task = chain(task, save_and_upload.s(folder_id, aws_bucket, s3_folder_name, parent_task_id))
+        signature_tasks.append(chain_task)
         processing_delay = 15  # in seconds
         time.sleep(processing_delay)
 
@@ -215,6 +205,7 @@ def send_webhook_message(data, webhook_url):
                     {"name": "Failed Count", "value": str(data['failed_count']), "inline": True},
                     {"name": "S3 Upload URLS", "value": s3_urls, "inline": True},
                     {"name": "Batch Status", "value": data['batch_status'], "inline": True},
+                    {"name": "Folder ID", "value": data['folder_id'], "inline": True},
                 ]
             }
         ]
@@ -235,7 +226,8 @@ def send_webhook_message(data, webhook_url):
 def finalize_task(final_result, folder_id):
     # Check if all tasks were successful before removing the directory
     if final_result.get('batch_status') == 'success':
-        os.removedirs(folder_id)
+        # Use shutil.rmtree to remove the directory and its contents
+        shutil.rmtree(folder_id)
 
     logger.info(f"Final Result Data: {str(final_result)}")
 
@@ -256,7 +248,8 @@ def handle_final_result(successful_results,failed_results, s3_urls, parent_task_
         "parent_task_id": parent_task_id,
         "bucket": aws_bucket,
         "s3_urls": s3_urls,
-        "batch_status": batch_status
+        "batch_status": batch_status,
+        "folder_id": folder_id
     }
 
     # # Do these two tasks synchronously...
