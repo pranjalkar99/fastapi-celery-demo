@@ -186,7 +186,7 @@ def send_discord_message(data):
 
 
 @celery.task(name="send_webhook_message")
-def send_webhook_message(data, webhook_url):
+def send_webhook_message(data, webhook_url, folder_id):
 
     s3_urls = data.get('s3_urls',None)
     if s3_urls is not None:
@@ -205,7 +205,7 @@ def send_webhook_message(data, webhook_url):
                     {"name": "Failed Count", "value": str(data['failed_count']), "inline": True},
                     {"name": "S3 Upload URLS", "value": s3_urls, "inline": True},
                     {"name": "Batch Status", "value": data['batch_status'], "inline": True},
-                    {"name": "Folder ID", "value": data['folder_id'], "inline": True},
+                    {"name": "Folder ID", "value": folder_id, "inline": True},
                 ]
             }
         ]
@@ -258,7 +258,7 @@ def handle_final_result(successful_results,failed_results, s3_urls, parent_task_
     # final_result = update_final_result(upload_result, final_result)
 
     send_discord_message.delay(final_result)
-    send_webhook_message.delay(final_result, webhook_url)
+    send_webhook_message.delay(final_result, webhook_url, folder_id)
     finalize_task.delay(final_result, folder_id)
 
 
