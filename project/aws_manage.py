@@ -81,7 +81,7 @@ def save_image(processed_image, folder_id, model, aws_bucket, s3_folder_name):
         return image_path, s3_url
     except Exception as e:
         logger.error(f"Error saving/uploading image: {str(e)}")
-        # Log the exception and return None for both image_path and s3_url
+        
         return None, None
 
 
