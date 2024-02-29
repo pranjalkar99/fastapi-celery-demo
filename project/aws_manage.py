@@ -5,8 +5,13 @@ import boto3
 from botocore.exceptions import NoCredentialsError
 load_dotenv()
 import logging
-logging.basicConfig(filename='logs/aws_manage.log', level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+logging.basicConfig(filename='logs/aws_manage.log', format='%(asctime)s %(message)s',
+                    filemode='w')
+
+
+logger = logging.getLogger()
+
+logger.setLevel(logging.DEBUG)
 
 
 def upload_to_s3(local_filename, s3_bucket, s3_folder):

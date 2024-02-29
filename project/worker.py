@@ -11,8 +11,11 @@ import time, logging
 from db_utils import *
 from aws_manage import *
 
-logging.basicConfig(filename='logs/worker.log', level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+logging.basicConfig(filename='logs/worker.log', format='%(asctime)s %(message)s',
+                    filemode='w')
+logger = logging.getLogger()
+
+logger.setLevel(logging.DEBUG)
 
 from celery import Celery, group, chord, chain
 import random
@@ -28,14 +31,17 @@ def save_image(base64_image, folder_id, model, aws_bucket, s3_folder_name):
     timestamp = int(time.time())
 
     # Check if the folder exists, if not, create it
-    if not os.path.exists(folder_id):
-        os.makedirs(folder_id)
+    current_directory = os.getcwd()
+    folder_path = os.path.join(current_directory, folder_id)
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    
 
     image_data = base64.b64decode(base64_image.split(',')[1])
     image = Image.open(BytesIO(image_data))
 
     image_name = f'output_image_{model}_{timestamp}.jpg'
-    image_path = os.path.join(folder_id, image_name)
+    image_path = os.path.join(folder_path, image_name)
 
     try:
         image.save(image_path, 'JPEG')
