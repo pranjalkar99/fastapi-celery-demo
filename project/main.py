@@ -49,6 +49,19 @@ def read_alllogs():
     return logs_content
     
 
+@app.get("/ui", dependencies=[Depends(authenticate)], response_class=HTMLResponse)
+async def ui(request: Request):
+    
+
+    return templates.TemplateResponse(
+        "index.html",
+        context={
+            "request": request,
+            
+        }
+    )
+
+
 @app.get("/device-stats", dependencies=[Depends(authenticate)], response_class=JSONResponse)
 async def get_device_stats():
     # Get CPU usage
