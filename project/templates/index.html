@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Upload UI</title>
+    <!-- Add Bootstrap CDN link -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="...">
+    <!-- Add Font Awesome CDN link -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css" rel="stylesheet" integrity="...">
+</head>
+<body>
+    <div id="app">
+        <div class="container mt-5">
+            <h1 class="mb-4">Image Upload</h1>
+            
+            <!-- Image Upload Form -->
+            <form @submit.prevent="uploadImages">
+                <div class="mb-3">
+                    <label for="imageUpload" class="form-label">Select Images</label>
+                    <input type="file" id="imageUpload" ref="fileInput" multiple class="form-control" accept="image/*">
+                </div>
+
+                <div class="mb-3">
+                    <label for="webhookUrl" class="form-label">Webhook URL</label>
+                    <input type="text" v-model="webhookUrl" class="form-control" placeholder="Default: https://discord.com/api/webhooks/...">
+                </div>
+
+                <button type="submit" class="btn btn-primary">Upload Images</button>
+            </form>
+
+            <!-- Loading and Status Messages -->
+            <div v-if="loading" class="mt-4">
+                <p>Loading...</p>
+            </div>
+            
+            <div v-if="statusMessage" class="mt-4">
+                <p>{{ statusMessage }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Vue.js CDN link -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <!-- Add your Vue.js script directly here -->
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                loading: false,
+                webhookUrl: 'https://discord.com/api/webhooks/1201505585301049345/UuT5TLTlR8TTVGM9Pd1IgDm5g76roSYKAjkhJJwiymJnDJIgmhQ80rjDiG9rxhYxdscx',
+                statusMessage: null
+            },
+            methods: {
+                async uploadImages() {
+                    // Get selected files
+                    const files = this.$refs.fileInput.files;
+
+                    // Display loading message
+                    this.loading = true;
+                    this.statusMessage = null;
+
+                    try {
+                        // Use FormData to handle file uploads
+                        const formData = new FormData();
+                        formData.append('folder_id', 'your_folder_id');
+                        for (let i = 0; i < files.length; i++) {
+                            formData.append('images', files[i]);
+                        }
+
+                        // Make POST request to create_task
+                        const response = await fetch('/tasks', {
+                            method: 'POST',
+                            body: formData,
+                            headers: {
+                                'Authorization': 'Bearer your_jwt_token'
+                            }
+                        });
+
+                        const data = await response.json();
+
+                        // Update status message
+                        this.statusMessage = `Task created successfully. Task ID: ${data.task_id}`;
+                    } catch (error) {
+                        console.error('Error uploading images:', error);
+                        this.statusMessage = 'Error uploading images. Please try again.';
+                    } finally {
+                        // Hide loading message
+                        this.loading = false;
+                    }
+                }
+            }
+        });
+    </script>
+    <!-- Add Bootstrap JS and Popper.js CDN links if needed -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js" integrity="..." crossorigin="anonymous"></script>
+</body>
+</html>
