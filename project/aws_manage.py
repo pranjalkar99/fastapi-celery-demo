@@ -84,6 +84,30 @@ def save_image(processed_image, folder_id, model, aws_bucket, s3_folder_name):
         
         return None, None
 
+def is_private_s3_url(image_url):
+    # Check for the presence of a signature parameter
+    return 'X-Amz-Signature=' in image_url
+
+
+def authorize_s3_link(image_url):
+    try:
+        ACCESS_KEY = os.getenv('AWS_ACCESS_KEY_ID')
+        SECRET_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+        s3 = boto3.client('s3', aws_access_key_id=ACCESS_KEY, aws_secret_access_key=SECRET_KEY)
+
+        # Extract bucket and object key from the S3 URL
+        bucket = image_url.split('/')[2]
+        key = '/'.join(image_url.split('/')[3:])
+
+        # Generate a pre-signed URL with a limited time validity (e.g., 60 seconds)
+        presigned_url = s3.generate_presigned_url('get_object', Params={'Bucket': bucket, 'Key': key}, ExpiresIn=60)
+
+        return presigned_url
+
+    except NoCredentialsError:
+        print('Credentials not available')
+
+
 
 if __name__ =="__main__":
     upload_images_to_s3('him2pk','pk_out_debug_2','ovvy-ml-output')
